@@ -14,9 +14,9 @@ import (
 )
 
 type Server struct {
-	httpServer *http.Server
-	log        *slog.Logger
-	shutdown   time.Duration
+	httpServer      *http.Server
+	log             *slog.Logger
+	shutdownTimeout time.Duration
 }
 
 func New(cfg config.ServerConfig, log *slog.Logger, handler *gin.Engine) *Server {
@@ -28,8 +28,8 @@ func New(cfg config.ServerConfig, log *slog.Logger, handler *gin.Engine) *Server
 			WriteTimeout: 15 * time.Second,
 			IdleTimeout:  60 * time.Second,
 		},
-		log:      log,
-		shutdown: cfg.ShutdownTimeout,
+		log:             log,
+		shutdownTimeout: cfg.ShutdownTimeout,
 	}
 }
 
@@ -52,9 +52,9 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 func (s *Server) shutdown() error {
-	s.log.Info("shutting down http server", slog.Duration("timeout", s.shutdown))
+	s.log.Info("shutting down http server", slog.Duration("timeout", s.shutdownTimeout))
 
-	ctx, cancel := context.WithTimeout(context.Background(), s.shutdown)
+	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
 	defer cancel()
 
 	if err := s.httpServer.Shutdown(ctx); err != nil {
