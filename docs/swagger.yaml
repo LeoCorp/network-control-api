@@ -1,0 +1,528 @@
+basePath: /
+definitions:
+  internal_handlers.AuthResponse:
+    properties:
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      user:
+        $ref: '#/definitions/internal_handlers.UserResponse'
+    type: object
+  internal_handlers.CreateDeviceRequest:
+    properties:
+      description:
+        example: Primary edge router
+        maxLength: 2000
+        type: string
+      ip_address:
+        example: 10.0.0.1
+        maxLength: 45
+        type: string
+      location:
+        example: DC-East
+        maxLength: 255
+        type: string
+      name:
+        example: Core Router 01
+        maxLength: 255
+        minLength: 2
+        type: string
+      status:
+        enum:
+        - online
+        - offline
+        - degraded
+        - maintenance
+        example: online
+        type: string
+      type:
+        enum:
+        - router
+        - tower
+        - switch
+        - core_node
+        - link
+        - service
+        example: router
+        type: string
+    required:
+    - name
+    - type
+    type: object
+  internal_handlers.DeviceListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/internal_handlers.DeviceResponse'
+        type: array
+      meta:
+        $ref: '#/definitions/internal_handlers.PaginationMetaResponse'
+    type: object
+  internal_handlers.DeviceResponse:
+    properties:
+      created_at:
+        example: "2026-05-15T12:00:00Z"
+        type: string
+      description:
+        example: Primary edge router
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      ip_address:
+        example: 10.0.0.1
+        type: string
+      location:
+        example: DC-East
+        type: string
+      name:
+        example: Core Router 01
+        type: string
+      status:
+        example: online
+        type: string
+      type:
+        example: router
+        type: string
+      updated_at:
+        example: "2026-05-15T12:00:00Z"
+        type: string
+    type: object
+  internal_handlers.ErrorResponse:
+    properties:
+      error:
+        example: invalid credentials
+        type: string
+    type: object
+  internal_handlers.LoginRequest:
+    properties:
+      email:
+        example: operator@noc.local
+        type: string
+      password:
+        example: password123
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  internal_handlers.PaginationMetaResponse:
+    properties:
+      current_page:
+        example: 1
+        type: integer
+      limit:
+        example: 10
+        type: integer
+      total:
+        example: 42
+        type: integer
+      total_pages:
+        example: 5
+        type: integer
+    type: object
+  internal_handlers.RegisterRequest:
+    properties:
+      email:
+        example: operator@noc.local
+        type: string
+      password:
+        example: password123
+        minLength: 8
+        type: string
+      role:
+        enum:
+        - admin
+        - operator
+        - viewer
+        example: operator
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  internal_handlers.UpdateDeviceRequest:
+    properties:
+      description:
+        example: Under maintenance
+        maxLength: 2000
+        type: string
+      ip_address:
+        example: 10.0.0.2
+        maxLength: 45
+        type: string
+      location:
+        example: DC-West
+        maxLength: 255
+        type: string
+      name:
+        example: Core Router 01
+        maxLength: 255
+        minLength: 2
+        type: string
+      status:
+        enum:
+        - online
+        - offline
+        - degraded
+        - maintenance
+        example: maintenance
+        type: string
+      type:
+        enum:
+        - router
+        - tower
+        - switch
+        - core_node
+        - link
+        - service
+        example: router
+        type: string
+    type: object
+  internal_handlers.UserResponse:
+    properties:
+      created_at:
+        example: "2026-05-15T12:00:00Z"
+        type: string
+      email:
+        example: operator@noc.local
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      role:
+        example: operator
+        type: string
+      updated_at:
+        example: "2026-05-15T12:00:00Z"
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Telecom NOC Monitoring Backend API
+  title: Network Control API
+  version: "1.0"
+paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate a user and return a JWT token
+      parameters:
+      - description: Login payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      summary: Login
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account and return a JWT token
+      parameters:
+      - description: Register payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_handlers.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      summary: Register a new user
+      tags:
+      - auth
+  /api/v1/devices:
+    get:
+      description: List devices with pagination, search, and filters
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search name, location, IP, description
+        in: query
+        name: search
+        type: string
+      - description: Device type
+        enum:
+        - router
+        - tower
+        - switch
+        - core_node
+        - link
+        - service
+        in: query
+        name: type
+        type: string
+      - description: Device status
+        enum:
+        - online
+        - offline
+        - degraded
+        - maintenance
+        in: query
+        name: status
+        type: string
+      - description: Sort field
+        enum:
+        - name
+        - type
+        - status
+        - created_at
+        - updated_at
+        in: query
+        name: sort_by
+        type: string
+      - description: Sort order
+        enum:
+        - asc
+        - desc
+        in: query
+        name: sort_order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.DeviceListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List devices
+      tags:
+      - devices
+    post:
+      consumes:
+      - application/json
+      description: Create a new network device (admin, operator)
+      parameters:
+      - description: Device payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.CreateDeviceRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_handlers.DeviceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create device
+      tags:
+      - devices
+  /api/v1/devices/{id}:
+    delete:
+      description: Delete a device by UUID (admin only)
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete device
+      tags:
+      - devices
+    get:
+      description: Retrieve a single device by UUID
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.DeviceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get device by ID
+      tags:
+      - devices
+    patch:
+      consumes:
+      - application/json
+      description: Partially update a device (admin, operator)
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device update payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.UpdateDeviceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.DeviceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update device
+      tags:
+      - devices
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -13,6 +13,7 @@ type Config struct {
 	App      AppConfig
 	Server   ServerConfig
 	Database DatabaseConfig
+	JWT      JWTConfig
 	Log      LogConfig
 }
 
@@ -34,6 +35,11 @@ type DatabaseConfig struct {
 	Password string
 	Name     string
 	SSLMode  string
+}
+
+type JWTConfig struct {
+	Secret     string
+	Expiration time.Duration
 }
 
 type LogConfig struct {
@@ -78,6 +84,10 @@ func Load() (*Config, error) {
 			Name:     getEnv("DB_NAME", "network_control"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
+		JWT: JWTConfig{
+			Secret:     getEnv("JWT_SECRET", ""),
+			Expiration: parseJWTExpiration(getEnv("JWT_EXPIRATION_HOURS", "24")),
+		},
 		Log: LogConfig{
 			Level:  getEnv("LOG_LEVEL", "info"),
 			Format: getEnv("LOG_FORMAT", "text"),
@@ -98,7 +108,21 @@ func (c *Config) validate() error {
 	if c.Database.Host == "" || c.Database.User == "" || c.Database.Name == "" {
 		return fmt.Errorf("database configuration is incomplete")
 	}
+	if c.JWT.Secret == "" {
+		return fmt.Errorf("JWT_SECRET is required")
+	}
+	if c.JWT.Expiration <= 0 {
+		return fmt.Errorf("JWT_EXPIRATION_HOURS must be positive")
+	}
 	return nil
+}
+
+func parseJWTExpiration(hours string) time.Duration {
+	parsed, err := strconv.Atoi(hours)
+	if err != nil || parsed <= 0 {
+		return 24 * time.Hour
+	}
+	return time.Duration(parsed) * time.Hour
 }
 
 func getEnv(key, fallback string) string {
