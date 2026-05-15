@@ -1,0 +1,199 @@
+# Cursor Rules — Telecom NOC Monitoring Backend
+
+## General Rules
+
+- Always follow clean architecture principles.
+- Keep code modular and maintainable.
+- Prefer simplicity over unnecessary abstractions.
+- Avoid monolithic files.
+- Use explicit interfaces where appropriate.
+- Keep business logic outside handlers/controllers.
+
+---
+
+# Language & Stack
+
+- Use Golang.
+- Preferred frameworks:
+  - Gin OR Fiber
+- Database:
+  - PostgreSQL
+- Redis will be added in later phases.
+- Use Docker/docker-compose.
+
+---
+
+# Project Structure
+
+Prefer structures similar to:
+
+/cmd
+/internal
+    /handlers
+    /services
+    /repositories
+    /models
+    /middleware
+    /config
+    /monitoring
+    /websocket
+/pkg
+
+---
+
+# API Rules
+
+- Follow REST conventions.
+- Use JSON consistently.
+- Return proper HTTP status codes.
+- Add request validation.
+- Add pagination to list endpoints.
+- Add filtering/search where applicable.
+
+---
+
+# Authentication Rules
+
+- Use JWT authentication.
+- Implement middleware-based auth.
+- Support roles:
+  - admin
+  - operator
+  - viewer
+
+Never place authorization logic directly inside handlers.
+
+---
+
+# Database Rules
+
+- Use PostgreSQL.
+- Use migrations.
+- Repositories must encapsulate DB access.
+- Avoid raw SQL duplication.
+
+---
+
+# Swagger Rules
+
+- All endpoints must be documented.
+- Keep request/response models accurate.
+- Swagger should remain synchronized with implementation.
+
+---
+
+# Monitoring Engine Rules
+
+- Monitoring logic must run concurrently.
+- Use goroutines and channels.
+- Keep telemetry generation isolated from HTTP handlers.
+- Telemetry should initially remain in memory.
+- Persist only important events:
+  - alerts
+  - incidents
+  - audit logs
+
+---
+
+# Concurrency Rules
+
+- Avoid race conditions.
+- Use channels where event communication is needed.
+- Prefer worker patterns for async processing.
+- Keep goroutines controlled and manageable.
+
+---
+
+# Logging Rules
+
+- Add structured logging.
+- Log important events:
+  - auth
+  - alerts
+  - incidents
+  - failures
+  - websocket events
+
+Avoid noisy logs.
+
+---
+
+# Error Handling Rules
+
+- Never ignore errors.
+- Return standardized API error responses.
+- Avoid panics in request lifecycle.
+- Add meaningful error messages.
+
+---
+
+# Docker Rules
+
+- The project must run using docker-compose.
+- Services:
+  - app
+  - postgres
+- Redis added later.
+
+---
+
+# WebSocket Rules
+
+Later phases should:
+- broadcast realtime events
+- notify live alerts
+- push device state updates
+
+Keep websocket logic isolated.
+
+---
+
+# Code Quality Rules
+
+- Small focused functions.
+- Avoid giant services.
+- Avoid duplicated logic.
+- Prefer composition over inheritance-style patterns.
+- Use meaningful names.
+
+---
+
+# Non-Goals
+
+Do NOT:
+- add microservices initially
+- add Kubernetes
+- overcomplicate architecture
+- add unnecessary frameworks
+- add frontend before backend core is stable
+
+---
+
+# Development Flow
+
+Always develop incrementally:
+
+1. Core backend
+2. Authentication
+3. CRUD APIs
+4. Pagination/filtering
+5. Monitoring engine
+6. Concurrent processing
+7. Alerts/incidents
+8. WebSockets
+9. Advanced NOC features
+
+Never skip foundational layers.
+
+---
+
+# Expected Standards
+
+The project should resemble a small production-ready backend system.
+
+Prioritize:
+- readability
+- maintainability
+- engineering quality
+- scalability concepts
+- backend best practices
