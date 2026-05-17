@@ -152,7 +152,7 @@ go build -o bin/server ./cmd/server
 | `LOG_LEVEL`               | `info`               | Log level: `debug`, `info`, `warn`, `error` |
 | `LOG_FORMAT`              | `text`               | Log format: `text` or `json`         |
 | `DB_HOST`                 | `localhost`          | PostgreSQL host                      |
-| `DB_PORT`                 | `5432`               | PostgreSQL port                      |
+| `DB_PORT`                 | `5433`               | PostgreSQL port                      |
 | `DB_USER`                 | `postgres`           | PostgreSQL user                      |
 | `DB_PASSWORD`             | `postgres`           | PostgreSQL password                  |
 | `DB_NAME`                 | `network_control`    | PostgreSQL database name             |
