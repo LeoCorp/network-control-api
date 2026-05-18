@@ -321,6 +321,8 @@ Phase 2 has now been implemented in this repository. The monitoring subsystem ad
 - Alert engine that evaluates metrics against configurable rules and persists alerts to PostgreSQL.
 - Incident engine that receives critical alerts and triggers incident creation/processing pipelines.
 - WebSocket hub and handler to broadcast realtime events (metrics, device status changes, alerts, incidents) to connected clients.
+ - Database migrations now create `alerts` and `incidents` tables (auto-migrated at startup).
+ - WebSocket endpoint is protected by JWT (use the same `Authorization: Bearer <token>` header when upgrading).
 - Monitoring HTTP endpoints to inspect live runtime state and connect to the realtime feed:
   - `GET /api/v1/monitoring/live` — list current runtime state for devices
   - `GET /api/v1/monitoring/live/:id` — single device runtime state
@@ -376,13 +378,15 @@ go run ./cmd/server
 ```bash
 # install if needed
 npm install -g wscat
-wscat -c ws://localhost:8080/api/v1/monitoring/ws
+# with authentication header (wscat)
+wscat -H "Authorization: Bearer <JWT>" -c ws://localhost:8080/api/v1/monitoring/ws
 ```
 
 - Using websocat:
 
 ```bash
-websocat ws://localhost:8080/api/v1/monitoring/ws
+# with authentication header (websocat)
+websocat -H "Authorization: Bearer <JWT>" ws://localhost:8080/api/v1/monitoring/ws
 ```
 
 You should receive JSON events of type `metric`, `device_status`, `alert`, and `incident` while the monitoring engine is running.
