@@ -11,7 +11,9 @@ import (
 	"Network-control-api/internal/infrastructure/database"
 	"Network-control-api/internal/middleware"
 	"Network-control-api/internal/models"
+	"Network-control-api/internal/monitoring"
 	"Network-control-api/internal/services"
+	"Network-control-api/internal/websocket"
 )
 
 type Dependencies struct {
@@ -19,8 +21,10 @@ type Dependencies struct {
 	Log           *slog.Logger
 	DB            *database.Postgres
 	AuthService   *services.AuthService
-	DeviceService *services.DeviceService
-	JWTService    *auth.JWTService
+	DeviceService   *services.DeviceService
+	MonitorEngine   *monitoring.Engine
+	WSHub           *websocket.Hub
+	JWTService      *auth.JWTService
 }
 
 func New(deps Dependencies) *gin.Engine {
@@ -40,6 +44,8 @@ func New(deps Dependencies) *gin.Engine {
 	authHandler := handlers.NewAuthHandler(deps.AuthService)
 	protectedHandler := handlers.NewProtectedHandler()
 	deviceHandler := handlers.NewDeviceHandler(deps.DeviceService)
+	monitoringHandler := handlers.NewMonitoringHandler(deps.MonitorEngine)
+	wsHandler := websocket.NewHandler(deps.WSHub, deps.Log)
 
 	v1 := r.Group("/api/v1")
 	{
@@ -61,6 +67,13 @@ func New(deps Dependencies) *gin.Engine {
 				devices.POST("", middleware.RequireRoles(models.RoleAdmin, models.RoleOperator), deviceHandler.Create)
 				devices.PATCH("/:id", middleware.RequireRoles(models.RoleAdmin, models.RoleOperator), deviceHandler.Update)
 				devices.DELETE("/:id", middleware.RequireRoles(models.RoleAdmin), deviceHandler.Delete)
+			}
+
+			monitoringGroup := protected.Group("/monitoring")
+			{
+				monitoringGroup.GET("/live", monitoringHandler.ListLive)
+				monitoringGroup.GET("/live/:id", monitoringHandler.GetLiveByID)
+				monitoringGroup.GET("/ws", wsHandler.Serve)
 			}
 		}
 	}

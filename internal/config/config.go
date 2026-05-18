@@ -10,11 +10,12 @@ import (
 )
 
 type Config struct {
-	App      AppConfig
-	Server   ServerConfig
-	Database DatabaseConfig
-	JWT      JWTConfig
-	Log      LogConfig
+	App        AppConfig
+	Server     ServerConfig
+	Database   DatabaseConfig
+	JWT        JWTConfig
+	Monitoring MonitoringConfig
+	Log        LogConfig
 }
 
 type AppConfig struct {
@@ -40,6 +41,12 @@ type DatabaseConfig struct {
 type JWTConfig struct {
 	Secret     string
 	Expiration time.Duration
+}
+
+type MonitoringConfig struct {
+	Interval      time.Duration
+	DeviceRefresh time.Duration
+	ChannelBuffer int
 }
 
 type LogConfig struct {
@@ -88,6 +95,11 @@ func Load() (*Config, error) {
 			Secret:     getEnv("JWT_SECRET", ""),
 			Expiration: parseJWTExpiration(getEnv("JWT_EXPIRATION_HOURS", "24")),
 		},
+		Monitoring: MonitoringConfig{
+			Interval:      parseMonitoringDuration(getEnv("MONITORING_INTERVAL_SECONDS", "5"), 5),
+			DeviceRefresh: parseMonitoringDuration(getEnv("MONITORING_DEVICE_REFRESH_SECONDS", "30"), 30),
+			ChannelBuffer: parseMonitoringBuffer(getEnv("MONITORING_CHANNEL_BUFFER", "64"), 64),
+		},
 		Log: LogConfig{
 			Level:  getEnv("LOG_LEVEL", "info"),
 			Format: getEnv("LOG_FORMAT", "text"),
@@ -115,6 +127,22 @@ func (c *Config) validate() error {
 		return fmt.Errorf("JWT_EXPIRATION_HOURS must be positive")
 	}
 	return nil
+}
+
+func parseMonitoringDuration(seconds string, fallback int) time.Duration {
+	parsed, err := strconv.Atoi(seconds)
+	if err != nil || parsed <= 0 {
+		return time.Duration(fallback) * time.Second
+	}
+	return time.Duration(parsed) * time.Second
+}
+
+func parseMonitoringBuffer(value string, fallback int) int {
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }
 
 func parseJWTExpiration(hours string) time.Duration {

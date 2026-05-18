@@ -22,10 +22,12 @@ import (
 	"Network-control-api/internal/infrastructure/database"
 	"Network-control-api/internal/infrastructure/migrate"
 	"Network-control-api/internal/logger"
+	"Network-control-api/internal/monitoring"
 	"Network-control-api/internal/repositories"
 	"Network-control-api/internal/router"
 	"Network-control-api/internal/server"
 	"Network-control-api/internal/services"
+	"Network-control-api/internal/websocket"
 )
 
 func main() {
@@ -59,12 +61,68 @@ func main() {
 	authService := services.NewAuthService(userRepo, jwtService)
 	deviceService := services.NewDeviceService(deviceRepo)
 
+	wsHub := websocket.NewHub(log, cfg.Monitoring.ChannelBuffer)
+	if err := wsHub.Start(ctx); err != nil {
+		log.Error("failed to start websocket hub", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	defer wsHub.Stop()
+
+	realtimeSink := wsHub.EventsSink()
+
+	incidentRepo := repositories.NewIncidentRepository(db.Pool)
+	incidentEngine := monitoring.NewIncidentEngine(log, incidentRepo, cfg.Monitoring.ChannelBuffer, realtimeSink)
+
+	if err := incidentEngine.Start(ctx); err != nil {
+		log.Error("failed to start incident engine", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	defer incidentEngine.Stop()
+
+	alertRepo := repositories.NewAlertRepository(db.Pool)
+	alertEngine := monitoring.NewAlertEngine(
+		log,
+		alertRepo,
+		cfg.Monitoring.ChannelBuffer,
+		nil,
+		incidentEngine.CriticalAlertsSink(),
+		realtimeSink,
+	)
+
+	if err := alertEngine.Start(ctx); err != nil {
+		log.Error("failed to start alert engine", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	defer alertEngine.Stop()
+
+	monitorStore := monitoring.NewStore()
+	monitorEngine := monitoring.NewEngine(
+		log,
+		monitoring.Config{
+			Interval:      cfg.Monitoring.Interval,
+			DeviceRefresh: cfg.Monitoring.DeviceRefresh,
+			ChannelBuffer: cfg.Monitoring.ChannelBuffer,
+		},
+		monitoring.NewRepositoryDeviceProvider(deviceRepo),
+		monitorStore,
+		alertEngine.MetricsSink(),
+		realtimeSink,
+	)
+
+	if err := monitorEngine.Start(ctx); err != nil {
+		log.Error("failed to start monitoring engine", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	defer monitorEngine.Stop()
+
 	engine := router.New(router.Dependencies{
-		Config:        cfg,
-		Log:           log,
-		DB:            db,
-		AuthService:   authService,
-		DeviceService: deviceService,
+		Config:          cfg,
+		Log:             log,
+		DB:              db,
+		AuthService:     authService,
+		DeviceService:   deviceService,
+		MonitorEngine: monitorEngine,
+		WSHub:         wsHub,
 		JWTService:    jwtService,
 	})
 
