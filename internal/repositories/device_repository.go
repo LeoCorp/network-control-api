@@ -27,6 +27,7 @@ type DeviceRepository interface {
 	Create(ctx context.Context, device *models.Device) error
 	FindByID(ctx context.Context, id uuid.UUID) (*models.Device, error)
 	Update(ctx context.Context, device *models.Device) error
+	UpdateStatus(ctx context.Context, id uuid.UUID, status string) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	List(ctx context.Context, filter DeviceListFilter) (*PaginatedResult[models.Device], error)
 }
@@ -268,4 +269,22 @@ func (r *PostgresDeviceRepository) scanDevice(ctx context.Context, query string,
 	}
 
 	return &device, nil
+}
+
+func (r *PostgresDeviceRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string) error {
+	query := `
+		UPDATE devices
+		SET status = $2, updated_at = NOW()
+		WHERE id = $1
+	`
+	result, err := r.pool.Exec(ctx, query, id, status)
+	if err != nil {
+		return fmt.Errorf("update device status: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	return nil
 }

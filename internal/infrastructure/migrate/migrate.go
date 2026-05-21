@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS incidents (
 	title VARCHAR(255) NOT NULL,
 	description TEXT NOT NULL DEFAULT '',
 	status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+	escalated BOOLEAN NOT NULL DEFAULT FALSE,
 	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 	resolved_at TIMESTAMPTZ,
@@ -91,6 +92,18 @@ CREATE TABLE IF NOT EXISTS incident_alerts (
 
 CREATE INDEX IF NOT EXISTS idx_incident_alerts_incident_id ON incident_alerts (incident_id);
 CREATE INDEX IF NOT EXISTS idx_incident_alerts_alert_id ON incident_alerts (alert_id);
+
+CREATE TABLE IF NOT EXISTS incident_logs (
+	id UUID PRIMARY KEY,
+	incident_id UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+	user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+	action VARCHAR(50) NOT NULL,
+	message TEXT NOT NULL,
+	metadata JSONB,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_incident_logs_incident_id ON incident_logs (incident_id);
 `
 
 func Run(ctx context.Context, pool *pgxpool.Pool) error {
@@ -106,5 +119,12 @@ func Run(ctx context.Context, pool *pgxpool.Pool) error {
 	if _, err := pool.Exec(ctx, incidentsTableSQL); err != nil {
 		return fmt.Errorf("run incidents migration: %w", err)
 	}
+	
+	// Alter table safeguard for existing incidents table from Phase 2
+	alterQuery := `ALTER TABLE incidents ADD COLUMN IF NOT EXISTS escalated BOOLEAN NOT NULL DEFAULT FALSE;`
+	if _, err := pool.Exec(ctx, alterQuery); err != nil {
+		return fmt.Errorf("run incidents alter table: %w", err)
+	}
+	
 	return nil
 }

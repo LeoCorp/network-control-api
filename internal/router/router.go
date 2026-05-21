@@ -17,11 +17,12 @@ import (
 )
 
 type Dependencies struct {
-	Config        *config.Config
-	Log           *slog.Logger
-	DB            *database.Postgres
-	AuthService   *services.AuthService
+	Config          *config.Config
+	Log             *slog.Logger
+	DB              *database.Postgres
+	AuthService     *services.AuthService
 	DeviceService   *services.DeviceService
+	IncidentService *services.IncidentService
 	MonitorEngine   *monitoring.Engine
 	WSHub           *websocket.Hub
 	JWTService      *auth.JWTService
@@ -44,6 +45,7 @@ func New(deps Dependencies) *gin.Engine {
 	authHandler := handlers.NewAuthHandler(deps.AuthService)
 	protectedHandler := handlers.NewProtectedHandler()
 	deviceHandler := handlers.NewDeviceHandler(deps.DeviceService)
+	incidentHandler := handlers.NewIncidentHandler(deps.IncidentService)
 	monitoringHandler := handlers.NewMonitoringHandler(deps.MonitorEngine)
 	wsHandler := websocket.NewHandler(deps.WSHub, deps.Log)
 
@@ -67,6 +69,14 @@ func New(deps Dependencies) *gin.Engine {
 				devices.POST("", middleware.RequireRoles(models.RoleAdmin, models.RoleOperator), deviceHandler.Create)
 				devices.PATCH("/:id", middleware.RequireRoles(models.RoleAdmin, models.RoleOperator), deviceHandler.Update)
 				devices.DELETE("/:id", middleware.RequireRoles(models.RoleAdmin), deviceHandler.Delete)
+			}
+
+			incidents := protected.Group("/incidents")
+			{
+				incidents.GET("", incidentHandler.List)
+				incidents.GET("/:id", incidentHandler.GetByID)
+				incidents.PATCH("/:id/status", middleware.RequireRoles(models.RoleAdmin, models.RoleOperator), incidentHandler.UpdateStatus)
+				incidents.GET("/:id/logs", incidentHandler.GetLogs)
 			}
 
 			monitoringGroup := protected.Group("/monitoring")

@@ -2,25 +2,27 @@
 
 Backend for a **Telecom NOC (Network Operations Center) monitoring simulation platform**. The system is designed to simulate network infrastructure, telemetry, alerts, and incident workflows for learning and portfolio purposes — not for monitoring real production infrastructure.
 
-This repository is built incrementally in phases. **Phase 1 (current)** provides the core backend foundation.
+This repository is built incrementally in phases. **Phase 3 (current)** provides a complete simulated NOC monitoring platform, including telemetry generation, alerting, real-time WebSockets, incident management, audit logging, and automated escalation workers.
 
 ---
 
-## Features (Phase 1)
+## Core Features
 
-- Gin HTTP server with clean architecture layout
-- Environment-based configuration (`.env` support)
-- Structured logging (`slog`)
-- PostgreSQL connection pool (`pgx`)
-- Health check endpoint with database status
-- Graceful shutdown on `SIGINT` / `SIGTERM`
-- Request logging middleware
-- User registration and login (JWT)
-- Password hashing (bcrypt)
-- JWT authentication middleware
-- Auto-migration for `users` and `devices` tables
-- Device CRUD with pagination, filtering, and role-based access
-- Swagger/OpenAPI documentation (auth & devices)
+- **Phases 1 & 2 (Foundation & Telemetry):**
+  - Gin HTTP server with clean architecture layout and structured logging (`slog`).
+  - PostgreSQL connection pool (`pgx`) with safe startup migration guards.
+  - JWT Authentication middleware supporting role-based access control (`admin`, `operator`, `viewer`).
+  - Device CRUD with advanced pagination, filtering, and query sorting.
+  - Periodic telemetry simulator generating metrics and evaluating alert thresholds in memory.
+  - Persistent alert engine with auto-linking of critical metrics to active incidents.
+  - Real-time WebSocket hub broadcasting metric events, status updates, and alerts to clients.
+  - Interactive Swagger/OpenAPI documentation for all endpoints.
+
+- **Phase 3 (Incident Management & Concurrency):**
+  - **Full Incident API:** Query, paginate, and detail incidents along with their historical audit trail and alerts.
+  - **Audit Logs with JSONB:** Automatically log all actions (`created`, `status_changed`, `alert_linked`, `escalated`) into an audit trail table using flexible JSONB metadata storing status transition states.
+  - **Auto-Escalation Worker:** Background routine polling open unacknowledged incidents. If age exceeds configured seconds, it marks them as escalated, prepends `[ESCALATED] ` to their title, and records an audit log.
+  - **Dynamic Device Syncing:** Syncs PostgreSQL device status dynamically: `ONLINE` (no active incidents), `DEGRADED` (normal active incidents), or `OFFLINE` (escalated or telemetry-triggered downtime).
 
 ---
 
@@ -159,6 +161,7 @@ go build -o bin/server ./cmd/server
 | `DB_SSLMODE`              | `disable`            | PostgreSQL SSL mode                  |
 | `JWT_SECRET`              | *(required)*         | Secret key for signing JWTs          |
 | `JWT_EXPIRATION_HOURS`    | `24`                 | Token lifetime in hours              |
+| `INCIDENT_ESCALATION_SECONDS` | `30`             | Incident response SLA time before auto-escalation (seconds) |
 
 ---
 
@@ -407,4 +410,134 @@ curl -H "Authorization: Bearer $JWT" http://localhost:8080/api/v1/monitoring/liv
 
 ---
 
-If you want me to add specific curl examples for creating users, obtaining JWTs, or a short demo script that wires everything together (create user, login, connect websocket, list live states), tell me which flows you prefer and I will add them to the README.
+## Phase 3 — Incident Management & Realtime (Implemented)
+
+Phase 3 introduces the operations workflow of a simulated Network Operations Center (NOC). This includes the RESTful API for managing incidents, persisting a full audit trail (audit logs) with `metadata JSONB` columns, syncing persistent device database statuses based on active incidents, and automated background escalations.
+
+### Incidents API Endpoints
+
+All incident routes require JWT authentication.
+
+| Method  | Path                             | Roles                    | Description |
+|---------|----------------------------------|--------------------------|-------------|
+| `GET`   | `/api/v1/incidents`             | admin, operator, viewer   | Paginated list of incidents (filters: `status`, `device_id`) |
+| `GET`   | `/api/v1/incidents/:id`         | admin, operator, viewer   | Details of a specific incident (includes linked alerts & logs) |
+| `PATCH` | `/api/v1/incidents/:id/status`  | admin, operator          | Update incident status (`OPEN`, `INVESTIGATING`, `RESOLVED`) |
+| `GET`   | `/api/v1/incidents/:id/logs`    | admin, operator, viewer   | Historical audit trail for a specific incident |
+
+#### 1. List Incidents
+```http
+GET /api/v1/incidents?page=1&limit=10&status=OPEN
+Authorization: Bearer <jwt>
+```
+
+#### 2. Get Incident Details (with Linked Alerts & Audit Trail)
+```http
+GET /api/v1/incidents/7b949c8f-dc11-4775-9276-f84dbcb2ccfa
+Authorization: Bearer <jwt>
+```
+**Response Schema:**
+```json
+{
+  "incident": {
+    "id": "7b949c8f-dc11-4775-9276-f84dbcb2ccfa",
+    "device_id": "8c37d896-189f-431c-b26a-9a99266abfa9",
+    "device_name": "router-east-01",
+    "title": "Critical latency on router-east-01",
+    "description": "Latency metric has exceeded threshold",
+    "status": "OPEN",
+    "escalated": true,
+    "created_at": "2026-05-20T12:00:00Z",
+    "updated_at": "2026-05-20T12:05:00Z"
+  },
+  "alerts": [
+    {
+      "id": "2b9921da-085c-4f7f-ba7d-a128fb2cc1fa",
+      "device_id": "8c37d896-189f-431c-b26a-9a99266abfa9",
+      "device_name": "router-east-01",
+      "severity": "CRITICAL",
+      "metric": "latency",
+      "message": "high latency detected: 420ms",
+      "value": 420.0,
+      "threshold": 300.0,
+      "created_at": "2026-05-20T12:00:00Z"
+    }
+  ],
+  "logs": [
+    {
+      "id": "ea3c3d52-fa22-4889-8d26-ccfae32a229a",
+      "incident_id": "7b949c8f-dc11-4775-9276-f84dbcb2ccfa",
+      "action": "created",
+      "message": "Incident automatically created from critical alert.",
+      "created_at": "2026-05-20T12:00:00Z"
+    },
+    {
+      "id": "4dfba429-122e-4b68-b769-dcbbaee91fca",
+      "incident_id": "7b949c8f-dc11-4775-9276-f84dbcb2ccfa",
+      "action": "escalated",
+      "message": "Incident automatically escalated due to response delay.",
+      "metadata": {
+        "age_seconds": 30,
+        "escalation_seconds": 30
+      },
+      "created_at": "2026-05-20T12:00:30Z"
+    }
+  ]
+}
+```
+
+#### 3. Update Incident Status (Acknowledge / Resolve)
+Operators can manually transition status:
+- **`OPEN` ➔ `INVESTIGATING`:** Acknowledges the incident. Logs audit trail and updates device status in DB to `degraded`.
+- **`INVESTIGATING` / `OPEN` ➔ `RESOLVED`:** Closes the incident. Checks if other active incidents exist for the device. If none, transitions device back to `online` in PostgreSQL.
+```http
+PATCH /api/v1/incidents/7b949c8f-dc11-4775-9276-f84dbcb2ccfa/status
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "status": "INVESTIGATING"
+}
+```
+
+---
+
+## How to Test and Verify Phase 3 Features
+
+You can fully test Phase 3 either using the **Swagger UI** or **Postman/cURL**.
+
+### A. Testing via Swagger UI
+
+1. **Start the API:** Run `go run ./cmd/server` or `npm run dev`.
+2. **Access Swagger UI:** Navigate to [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html).
+3. **Register/Login:**
+   - Execute `/api/v1/auth/register` or `/api/v1/auth/login` to create a user and obtain a JWT token.
+4. **Authorize:**
+   - Click the **Authorize** lock button in the top right.
+   - Enter `Bearer <your-token>` (replacing `<your-token>` with the JWT string you copied) and click **Authorize**.
+5. **Inspect the Incident Management endpoints:**
+   - Under the `incidents` section, try calling `GET /api/v1/incidents` to list simulated incidents.
+   - To manually transition a status, select `PATCH /api/v1/incidents/{id}/status`, specify an Incident UUID, and provide a JSON body such as `{"status": "INVESTIGATING"}`.
+   - To inspect audit trails, use `GET /api/v1/incidents/{id}/logs`.
+
+### B. Observing Automated Escalations (Telemetry Simulation)
+
+1. Set `INCIDENT_ESCALATION_SECONDS=10` in your `.env` file to accelerate verification.
+2. Establish a WebSocket connection using a client tool like `wscat` or `websocat`:
+   ```bash
+   wscat -H "Authorization: Bearer <JWT>" -c ws://localhost:8080/api/v1/monitoring/ws
+   ```
+3. When device metrics trigger a critical alert, you'll receive a websocket event of type `incident` with `"action": "created"`.
+4. Observe the database `devices` status change to `degraded` for that device.
+5. Wait **10 seconds** without acknowledging it:
+   - You will see a new `incident` event with `"action": "escalated"` and `"escalated": true`.
+   - The title is updated to start with `[ESCALATED]`.
+   - The device status in the database is automatically set to `offline` to simulate critical downtime.
+6. Acknowledge and resolve the incident via the Swagger `PATCH` endpoint, then observe:
+   - The device status automatically restores to `online` in the database once the incident is resolved.
+   - The audit log correctly maps the transition states (`{"old_status": "OPEN", "new_status": "RESOLVED"}`) inside the `incident_logs` table.
+
+---
+
+If you want me to add specific curl examples for creating users, obtaining JWTs, or a short demo script that wires everything together, tell me which flows you prefer and I will add them to the README.
+

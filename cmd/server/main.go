@@ -71,7 +71,15 @@ func main() {
 	realtimeSink := wsHub.EventsSink()
 
 	incidentRepo := repositories.NewIncidentRepository(db.Pool)
-	incidentEngine := monitoring.NewIncidentEngine(log, incidentRepo, cfg.Monitoring.ChannelBuffer, realtimeSink)
+	incidentService := services.NewIncidentService(incidentRepo, deviceRepo, realtimeSink)
+	incidentEngine := monitoring.NewIncidentEngine(
+		log,
+		incidentRepo,
+		deviceRepo,
+		cfg.Monitoring.ChannelBuffer,
+		cfg.Monitoring.EscalationSeconds,
+		realtimeSink,
+	)
 
 	if err := incidentEngine.Start(ctx); err != nil {
 		log.Error("failed to start incident engine", slog.String("error", err.Error()))
@@ -121,9 +129,10 @@ func main() {
 		DB:              db,
 		AuthService:     authService,
 		DeviceService:   deviceService,
-		MonitorEngine: monitorEngine,
-		WSHub:         wsHub,
-		JWTService:    jwtService,
+		IncidentService: incidentService,
+		MonitorEngine:   monitorEngine,
+		WSHub:           wsHub,
+		JWTService:      jwtService,
 	})
 
 	srv := server.New(cfg.Server, log, engine)

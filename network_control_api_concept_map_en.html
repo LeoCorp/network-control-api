@@ -1,0 +1,347 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans,sans-serif);background:transparent}
+.map{padding:1.5rem 1rem 2rem;min-height:600px}
+.title{font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:1.5rem;text-align:center}
+.subtitle{font-size:12px;color:var(--color-text-secondary);text-align:center;margin-bottom:1.8rem}
+.layer{display:flex;gap:10px;justify-content:center;margin-bottom:10px;flex-wrap:wrap}
+.node{border-radius:10px;padding:10px 14px;cursor:pointer;transition:transform .15s,box-shadow .15s;border:0.5px solid var(--color-border-tertiary);position:relative;min-width:110px;text-align:center;background:var(--color-background-primary)}
+.node:hover{transform:translateY(-2px);border-color:var(--color-border-secondary)}
+.node.active{border-color:var(--color-border-info) !important;border-width:1.5px}
+.node-icon{font-size:18px;margin-bottom:4px}
+.node-title{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+.node-sub{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+.n-purple{background:linear-gradient(135deg,#EEEDFE 0%,#EEEDFE 100%);border-color:#AFA9EC}
+.n-teal{background:linear-gradient(135deg,#E1F5EE 0%,#E1F5EE 100%);border-color:#5DCAA5}
+.n-amber{background:linear-gradient(135deg,#FAEEDA 0%,#FAEEDA 100%);border-color:#EF9F27}
+.n-coral{background:linear-gradient(135deg,#FAECE7 0%,#FAECE7 100%);border-color:#F0997B}
+.n-blue{background:linear-gradient(135deg,#E6F1FB 0%,#E6F1FB 100%);border-color:#85B7EB}
+.n-gray{background:linear-gradient(135deg,#F1EFE8 0%,#F1EFE8 100%);border-color:#B4B2A9}
+.n-green{background:linear-gradient(135deg,#EAF3DE 0%,#EAF3DE 100%);border-color:#97C459}
+@media(prefers-color-scheme:dark){
+  .n-purple{background:#26215C;border-color:#7F77DD}
+  .n-teal{background:#04342C;border-color:#1D9E75}
+  .n-amber{background:#412402;border-color:#BA7517}
+  .n-coral{background:#4A1B0C;border-color:#D85A30}
+  .n-blue{background:#042C53;border-color:#378ADD}
+  .n-gray{background:#2C2C2A;border-color:#888780}
+  .n-green{background:#173404;border-color:#639922}
+  .n-purple .node-title,.n-purple .node-sub{color:#CECBF6}
+  .n-teal .node-title,.n-teal .node-sub{color:#9FE1CB}
+  .n-amber .node-title,.n-amber .node-sub{color:#FAC775}
+  .n-coral .node-title,.n-coral .node-sub{color:#F5C4B3}
+  .n-blue .node-title,.n-blue .node-sub{color:#B5D4F4}
+  .n-gray .node-title,.n-gray .node-sub{color:#D3D1C7}
+  .n-green .node-title,.n-green .node-sub{color:#C0DD97}
+}
+.arrows{display:flex;justify-content:center;gap:10px;margin-bottom:4px;flex-wrap:wrap}
+.arr-line{display:flex;flex-direction:column;align-items:center;min-width:110px;color:var(--color-text-tertiary);font-size:11px}
+.arr-icon{font-size:14px;line-height:1}
+.panel{display:none;margin-top:1.2rem;border-radius:12px;border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);padding:1.2rem 1.4rem;animation:fadeIn .2s ease}
+.panel.visible{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.panel-header{display:flex;align-items:center;gap:10px;margin-bottom:1rem}
+.panel-icon{font-size:22px}
+.panel-title{font-size:15px;font-weight:500;color:var(--color-text-primary)}
+.panel-close{margin-left:auto;cursor:pointer;font-size:14px;color:var(--color-text-secondary);background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:6px;padding:3px 10px}
+.panel-close:hover{border-color:var(--color-border-secondary)}
+.sections{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:520px){.sections{grid-template-columns:1fr}}
+.section{background:var(--color-background-primary);border-radius:8px;padding:0.8rem 1rem;border:0.5px solid var(--color-border-tertiary)}
+.sec-title{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.sec-body{font-size:12.5px;color:var(--color-text-primary);line-height:1.6}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:5px;margin:2px 2px 0 0;background:var(--color-background-tertiary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-tertiary)}
+.tag.c-info{background:var(--color-background-info);color:var(--color-text-info);border-color:transparent}
+.tag.c-warn{background:var(--color-background-warning);color:var(--color-text-warning);border-color:transparent}
+.tag.c-success{background:var(--color-background-success);color:var(--color-text-success);border-color:transparent}
+.tag.c-danger{background:var(--color-background-danger);color:var(--color-text-danger);border-color:transparent}
+.code{font-family:var(--font-mono,monospace);font-size:11.5px;background:var(--color-background-tertiary);padding:2px 6px;border-radius:4px;color:var(--color-text-primary)}
+.flow{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12px}
+.flow-step{padding:3px 8px;border-radius:5px;background:var(--color-background-tertiary);color:var(--color-text-primary);font-size:11.5px}
+.flow-arr{color:var(--color-text-tertiary)}
+</style>
+
+<div class="map">
+  <div class="title">Network Control API — Concept Map</div>
+  <div class="subtitle">Click any component to see what it does and where it lives in the code</div>
+
+  <div class="layer">
+    <div class="node n-gray" onclick="show('client')">
+      <div class="node-icon">🖥️</div>
+      <div class="node-title">HTTP Client</div>
+      <div class="node-sub">Postman / App</div>
+    </div>
+    <div class="node n-gray" onclick="show('ws-client')">
+      <div class="node-icon">📡</div>
+      <div class="node-title">WS Client</div>
+      <div class="node-sub">Real-time feed</div>
+    </div>
+  </div>
+
+  <div class="arrows">
+    <div class="arr-line"><div class="arr-icon">↓</div><div>REST</div></div>
+    <div class="arr-line"><div class="arr-icon">↓</div><div>WebSocket</div></div>
+  </div>
+
+  <div class="layer">
+    <div class="node n-purple" onclick="show('middleware')">
+      <div class="node-icon">🔐</div>
+      <div class="node-title">Middleware</div>
+      <div class="node-sub">JWT + Roles</div>
+    </div>
+    <div class="node n-purple" onclick="show('router')">
+      <div class="node-icon">🗺️</div>
+      <div class="node-title">Router / Gin</div>
+      <div class="node-sub">API v1 routes</div>
+    </div>
+    <div class="node n-purple" onclick="show('handlers')">
+      <div class="node-icon">📬</div>
+      <div class="node-title">Handlers</div>
+      <div class="node-sub">Request → Response</div>
+    </div>
+    <div class="node n-purple" onclick="show('websocket')">
+      <div class="node-icon">🔌</div>
+      <div class="node-title">WebSocket Hub</div>
+      <div class="node-sub">Event broadcast</div>
+    </div>
+  </div>
+
+  <div class="arrows">
+    <div class="arr-line"><div class="arr-icon">↓</div><div>calls</div></div>
+  </div>
+
+  <div class="layer">
+    <div class="node n-blue" onclick="show('auth-service')">
+      <div class="node-icon">🔑</div>
+      <div class="node-title">AuthService</div>
+      <div class="node-sub">Login + Register</div>
+    </div>
+    <div class="node n-blue" onclick="show('device-service')">
+      <div class="node-icon">📟</div>
+      <div class="node-title">DeviceService</div>
+      <div class="node-sub">Device CRUD</div>
+    </div>
+  </div>
+
+  <div class="arrows">
+    <div class="arr-line"><div class="arr-icon">↓</div><div>persists to</div></div>
+  </div>
+
+  <div class="layer">
+    <div class="node n-teal" onclick="show('repos')">
+      <div class="node-icon">🗄️</div>
+      <div class="node-title">Repositories</div>
+      <div class="node-sub">SQL + PostgreSQL</div>
+    </div>
+    <div class="node n-amber" onclick="show('monitor-engine')">
+      <div class="node-icon">⚙️</div>
+      <div class="node-title">Monitor Engine</div>
+      <div class="node-sub">Goroutines + metrics</div>
+    </div>
+    <div class="node n-amber" onclick="show('alert-engine')">
+      <div class="node-icon">🚨</div>
+      <div class="node-title">Alert Engine</div>
+      <div class="node-sub">Threshold evaluation</div>
+    </div>
+    <div class="node n-amber" onclick="show('incident-engine')">
+      <div class="node-icon">🔥</div>
+      <div class="node-title">Incident Engine</div>
+      <div class="node-sub">Critical alert handler</div>
+    </div>
+  </div>
+
+  <div class="arrows">
+    <div class="arr-line"><div class="arr-icon">↓</div><div>reads / writes</div></div>
+  </div>
+
+  <div class="layer">
+    <div class="node n-green" onclick="show('postgres')">
+      <div class="node-icon">🐘</div>
+      <div class="node-title">PostgreSQL</div>
+      <div class="node-sub">Persistent data</div>
+    </div>
+    <div class="node n-green" onclick="show('memory-store')">
+      <div class="node-icon">💾</div>
+      <div class="node-title">Memory Store</div>
+      <div class="node-sub">Live metrics in RAM</div>
+    </div>
+    <div class="node n-green" onclick="show('config')">
+      <div class="node-icon">📋</div>
+      <div class="node-title">Config + Logger</div>
+      <div class="node-sub">.env + slog</div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <div class="panel-header">
+      <div class="panel-icon" id="p-icon"></div>
+      <div class="panel-title" id="p-title"></div>
+      <button class="panel-close" onclick="hide()">✕ close</button>
+    </div>
+    <div class="sections" id="p-body"></div>
+  </div>
+</div>
+
+<script>
+const data = {
+  'client': {
+    icon: '🖥️', title: 'HTTP Client (Postman / App)',
+    sections: [
+      {t:'What does it do?', b:'Sends REST requests to the API. Can be Postman, curl, or a frontend app. Needs a JWT token to access protected routes.'},
+      {t:'Available routes', b:`<span class="tag c-info">POST /auth/register</span><span class="tag c-info">POST /auth/login</span><span class="tag">GET /devices</span><span class="tag">POST /devices</span><span class="tag">PATCH /devices/:id</span><span class="tag">DELETE /devices/:id</span><span class="tag">GET /monitoring/live</span>`},
+      {t:'Authentication', b:'The token is sent in the header <span class="code">Authorization: Bearer &lt;token&gt;</span>. Without a token, protected routes return 401.'},
+      {t:'Documentation', b:'The API has Swagger/OpenAPI available at <span class="code">/swagger/index.html</span> with all endpoints documented and testable.'}
+    ]
+  },
+  'ws-client': {
+    icon: '📡', title: 'WebSocket Client',
+    sections: [
+      {t:'What does it do?', b:'Connects to <span class="code">GET /api/v1/monitoring/ws</span> to receive real-time events without constant polling.'},
+      {t:'Event types received', b:`<span class="tag c-info">metric</span> New device metrics<br><span class="tag c-warn">device_status</span> Status change online/degraded/offline<br><span class="tag c-danger">alert</span> New alert generated<br><span class="tag c-danger">incident</span> Incident created or updated`},
+      {t:'Message format', b:'Each event arrives as JSON: <span class="code">{ type: "metric", payload: {...}, timestamp: "..." }</span>'},
+      {t:'When does it disconnect?', b:'The Hub detects slow clients: if the send buffer fills up, the client is automatically disconnected to avoid blocking the broadcast to other clients.'}
+    ]
+  },
+  'middleware': {
+    icon: '🔐', title: 'Middleware',
+    sections: [
+      {t:'What does it do?', b:'Intercepts every request before it reaches the handler. Validates the JWT token, extracts the user, and verifies they have the required role.'},
+      {t:'Files in the code', b:`<span class="code">internal/middleware/auth.go</span> — validates JWT<br><span class="code">internal/middleware/role.go</span> — checks roles<br><span class="code">internal/middleware/logging.go</span> — logs every request`},
+      {t:'System roles', b:`<span class="tag c-danger">admin</span> Full access: create, edit, delete<br><span class="tag c-warn">operator</span> Can create and edit devices<br><span class="tag c-info">viewer</span> Read-only access`},
+      {t:'Verification flow', b:`<div class="flow"><span class="flow-step">Request arrives</span><span class="flow-arr">→</span><span class="flow-step">Has JWT?</span><span class="flow-arr">→</span><span class="flow-step">Valid role?</span><span class="flow-arr">→</span><span class="flow-step">Handler</span></div>`}
+    ]
+  },
+  'router': {
+    icon: '🗺️', title: 'Router (Gin)',
+    sections: [
+      {t:'What does it do?', b:'Defines all API routes and connects them to their handlers. Separates public routes (auth) from protected routes that require JWT.'},
+      {t:'File in the code', b:'<span class="code">internal/router/router.go</span> — all route definitions in one place.'},
+      {t:'Route groups', b:`<span class="tag">/health</span> Public, no auth<br><span class="tag c-info">/api/v1/auth/*</span> Register and login<br><span class="tag c-warn">/api/v1/devices/*</span> CRUD with JWT<br><span class="tag c-warn">/api/v1/monitoring/*</span> Live feed + WebSocket`},
+      {t:'Framework used', b:'Uses <span class="code">gin-gonic</span>. Production mode activates <span class="code">gin.ReleaseMode</span> automatically when <span class="code">APP_ENV=production</span>.'}
+    ]
+  },
+  'handlers': {
+    icon: '📬', title: 'Handlers',
+    sections: [
+      {t:'What do they do?', b:'Receive the HTTP request, validate input data, call the corresponding service, and return a JSON response. They are the entry point for each endpoint.'},
+      {t:'Files in the code', b:`<span class="code">handlers/auth_handler.go</span><br><span class="code">handlers/device_handler.go</span><br><span class="code">handlers/monitoring_handler.go</span><br><span class="code">handlers/health.go</span>`},
+      {t:'What do they validate?', b:'Valid UUIDs in path params, valid device types, required fields in the body, pagination params (page, limit, sort_by, sort_order).'},
+      {t:'Common error responses', b:`<span class="tag">400</span> Invalid data <span class="tag">401</span> No token <span class="tag">403</span> No permission <span class="tag">404</span> Not found <span class="tag">409</span> Duplicate name`}
+    ]
+  },
+  'websocket': {
+    icon: '🔌', title: 'WebSocket Hub',
+    sections: [
+      {t:'What does it do?', b:'Manages all active WebSocket connections. Receives events from the monitoring engines and broadcasts them to all connected clients in real time.'},
+      {t:'Files in the code', b:`<span class="code">internal/websocket/hub.go</span> — the central manager<br><span class="code">internal/websocket/client.go</span> — a connected client<br><span class="code">internal/websocket/event.go</span> — event structure<br><span class="code">internal/websocket/publisher.go</span> — publish helper`},
+      {t:'Concurrency pattern', b:'Uses a single goroutine to manage client registration/deregistration, avoiding race conditions. Slow clients are disconnected automatically.'},
+      {t:'Event source', b:'Receives events from the Monitor Engine, Alert Engine, and Incident Engine through a shared channel <span class="code">eventSink chan&lt;-Event</span>.'}
+    ]
+  },
+  'auth-service': {
+    icon: '🔑', title: 'AuthService',
+    sections: [
+      {t:'What does it do?', b:'Handles user registration and login. Hashes passwords with bcrypt and generates signed JWT tokens. It is the only piece that touches authentication logic.'},
+      {t:'File in the code', b:'<span class="code">internal/services/auth_service.go</span> and <span class="code">internal/auth/jwt.go</span> for token generation.'},
+      {t:'Registration flow', b:`<div class="flow"><span class="flow-step">Email + password</span><span class="flow-arr">→</span><span class="flow-step">bcrypt hash</span><span class="flow-arr">→</span><span class="flow-step">Save user</span><span class="flow-arr">→</span><span class="flow-step">Generate JWT</span></div>`},
+      {t:'JWT token contains', b:'User ID, email, and role. The middleware decodes it on every request to know who is calling and what permissions they have.'}
+    ]
+  },
+  'device-service': {
+    icon: '📟', title: 'DeviceService',
+    sections: [
+      {t:'What does it do?', b:'Contains the business logic for managing network devices. Validates types and statuses before persisting. It is the layer between handlers and repositories.'},
+      {t:'File in the code', b:'<span class="code">internal/services/device_service.go</span>'},
+      {t:'Device types', b:`<span class="tag">router</span><span class="tag">tower</span><span class="tag">switch</span><span class="tag">core_node</span><span class="tag">link</span><span class="tag">service</span>`},
+      {t:'Possible statuses', b:`<span class="tag c-success">online</span><span class="tag c-danger">offline</span><span class="tag c-warn">degraded</span><span class="tag">maintenance</span><br>Status changes automatically based on metrics from the Monitor Engine.`}
+    ]
+  },
+  'repos': {
+    icon: '🗄️', title: 'Repositories',
+    sections: [
+      {t:'What do they do?', b:'The only layer that talks directly to PostgreSQL. They run raw SQL using pgx. Each entity has its own repository with a defined interface.'},
+      {t:'Files in the code', b:`<span class="code">repositories/device_repository.go</span><br><span class="code">repositories/user_repository.go</span><br><span class="code">repositories/alert_repository.go</span><br><span class="code">repositories/incident_repository.go</span>`},
+      {t:'Features', b:'Pagination, search, and filter support in <span class="code">pagination.go</span>. Typed errors: <span class="code">ErrNotFound</span>, <span class="code">ErrDuplicateName</span>, <span class="code">ErrDuplicateActiveIncident</span>.'},
+      {t:'Migrations', b:'<span class="code">internal/infrastructure/migrate/migrate.go</span> — runs on server startup, creates tables if they do not exist.'}
+    ]
+  },
+  'monitor-engine': {
+    icon: '⚙️', title: 'Monitor Engine',
+    sections: [
+      {t:'What does it do?', b:'The heart of the system. Runs 3 goroutines in parallel: one refreshes the device list, one periodically generates random metrics, and one processes them.'},
+      {t:'Files in the code', b:'<span class="code">internal/monitoring/engine.go</span> — orchestrator<br><span class="code">internal/monitoring/generator.go</span> — simulates metrics<br><span class="code">internal/monitoring/store.go</span> — in-memory state'},
+      {t:'Metrics it simulates', b:`<span class="tag c-info">latency</span> 0–250ms <span class="tag c-warn">packet_loss</span> 0–50% <span class="tag c-danger">cpu_usage</span> 0–100%<br>Generated randomly for each device every X seconds.`},
+      {t:'Concurrency', b:'Generates metrics in parallel (one goroutine per device) using <span class="code">sync.WaitGroup</span>. Uses <span class="code">sync.RWMutex</span> to protect the device list from concurrent access.'}
+    ]
+  },
+  'alert-engine': {
+    icon: '🚨', title: 'Alert Engine',
+    sections: [
+      {t:'What does it do?', b:'Receives metrics from the Monitor Engine and evaluates them against configured rules. If a metric exceeds a threshold, it creates and persists an alert in PostgreSQL.'},
+      {t:'Files in the code', b:'<span class="code">internal/monitoring/alert_engine.go</span><br><span class="code">internal/monitoring/alert_evaluator.go</span><br><span class="code">internal/monitoring/alert_candidate.go</span>'},
+      {t:'Alert severities', b:`<span class="tag c-info">INFO</span> Low thresholds exceeded<br><span class="tag c-warn">WARNING</span> Concerning values<br><span class="tag c-danger">CRITICAL</span> Requires immediate attention → triggers Incident Engine`},
+      {t:'Internal flow', b:`<div class="flow"><span class="flow-step">Metric arrives</span><span class="flow-arr">→</span><span class="flow-step">Evaluate rules</span><span class="flow-arr">→</span><span class="flow-step">Create alert</span><span class="flow-arr">→</span><span class="flow-step">Save to DB</span><span class="flow-arr">→</span><span class="flow-step">Broadcast WS</span></div>`}
+    ]
+  },
+  'incident-engine': {
+    icon: '🔥', title: 'Incident Engine',
+    sections: [
+      {t:'What does it do?', b:'Listens for CRITICAL alerts from the Alert Engine and automatically creates incidents. If an active incident already exists for that device, it simply links the new alert to it.'},
+      {t:'File in the code', b:'<span class="code">internal/monitoring/incident_engine.go</span>'},
+      {t:'Incident states', b:`<div class="flow"><span class="flow-step">OPEN</span><span class="flow-arr">→</span><span class="flow-step">INVESTIGATING</span><span class="flow-arr">→</span><span class="flow-step">RESOLVED</span></div><br>Created as OPEN. The NOC team updates the status manually.`},
+      {t:'Concurrency handling', b:'Uses a deduplication pattern: if two critical alerts arrive simultaneously for the same device, only one incident is created and both alerts are linked. The race condition is handled explicitly.'}
+    ]
+  },
+  'postgres': {
+    icon: '🐘', title: 'PostgreSQL',
+    sections: [
+      {t:'What gets saved?', b:'All data that must survive a restart: users, devices, alerts, and incidents. Real-time metrics are NOT saved — they would generate millions of rows.'},
+      {t:'Configuration', b:'<span class="code">internal/infrastructure/database/postgres.go</span> — connection using <span class="code">pgxpool</span> with connection pooling.<br><span class="code">docker-compose.yml</span> — spins up Postgres locally.'},
+      {t:'Main tables', b:`<span class="tag">users</span><span class="tag">devices</span><span class="tag">alerts</span><span class="tag">incidents</span><span class="tag">incident_alerts</span><br>The pivot table <span class="code">incident_alerts</span> links alerts to incidents.`},
+      {t:'Driver used', b:'<span class="code">pgx/v5</span> — modern Go driver for Postgres, more efficient than the standard <span class="code">database/sql</span>.'}
+    ]
+  },
+  'memory-store': {
+    icon: '💾', title: 'Memory Store (in RAM)',
+    sections: [
+      {t:'What does it do?', b:'Stores the last known state of each device in memory. This allows instant responses to <span class="code">GET /monitoring/live</span> without hitting the database.'},
+      {t:'Files in the code', b:'<span class="code">internal/monitoring/store.go</span><br><span class="code">internal/monitoring/status.go</span> — status change logic'},
+      {t:'What it holds per device', b:`<span class="tag c-info">current latency</span><span class="tag c-info">packet loss</span><span class="tag c-info">CPU usage</span><span class="tag">runtime_status</span><span class="tag">last_seen</span>`},
+      {t:'Important note', b:'This data is lost if the server restarts. That is intentional: historical metrics are not the goal here. Only alerts and incidents are persisted to disk.'}
+    ]
+  },
+  'config': {
+    icon: '📋', title: 'Config + Logger',
+    sections: [
+      {t:'What does Config do?', b:'Reads all environment variables at startup: server port, DB credentials, JWT secret, monitor intervals. Fails fast if anything is missing.'},
+      {t:'Files in the code', b:'<span class="code">internal/config/config.go</span> — struct with all parameters<br><span class="code">.env</span> — local development values'},
+      {t:'Key variables', b:`<span class="code">JWT_SECRET</span> token signing key<br><span class="code">MONITORING_INTERVAL</span> metric frequency<br><span class="code">DEVICE_REFRESH</span> device list reload<br><span class="code">CHANNEL_BUFFER</span> Go channel buffer size`},
+      {t:'Logger', b:'<span class="code">internal/logger/logger.go</span> — uses <span class="code">log/slog</span> (Go 1.21+ stdlib). Supports JSON format for production and human-readable text for development.'}
+    ]
+  }
+};
+
+function show(id) {
+  const d = data[id];
+  if(!d) return;
+  document.querySelectorAll('.node').forEach(n=>n.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('p-icon').textContent = d.icon;
+  document.getElementById('p-title').textContent = d.title;
+  const body = d.sections.map(s=>`
+    <div class="section">
+      <div class="sec-title">${s.t}</div>
+      <div class="sec-body">${s.b}</div>
+    </div>`).join('');
+  document.getElementById('p-body').innerHTML = body;
+  const panel = document.getElementById('panel');
+  panel.classList.add('visible');
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function hide() {
+  document.getElementById('panel').classList.remove('visible');
+  document.querySelectorAll('.node').forEach(n=>n.classList.remove('active'));
+}
+</script>

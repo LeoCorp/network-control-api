@@ -44,9 +44,10 @@ type JWTConfig struct {
 }
 
 type MonitoringConfig struct {
-	Interval      time.Duration
-	DeviceRefresh time.Duration
-	ChannelBuffer int
+	Interval          time.Duration
+	DeviceRefresh     time.Duration
+	ChannelBuffer     int
+	EscalationSeconds int
 }
 
 type LogConfig struct {
@@ -96,9 +97,10 @@ func Load() (*Config, error) {
 			Expiration: parseJWTExpiration(getEnv("JWT_EXPIRATION_HOURS", "24")),
 		},
 		Monitoring: MonitoringConfig{
-			Interval:      parseMonitoringDuration(getEnv("MONITORING_INTERVAL_SECONDS", "5"), 5),
-			DeviceRefresh: parseMonitoringDuration(getEnv("MONITORING_DEVICE_REFRESH_SECONDS", "30"), 30),
-			ChannelBuffer: parseMonitoringBuffer(getEnv("MONITORING_CHANNEL_BUFFER", "64"), 64),
+			Interval:          parseMonitoringDuration(getEnv("MONITORING_INTERVAL_SECONDS", "5"), 5),
+			DeviceRefresh:     parseMonitoringDuration(getEnv("MONITORING_DEVICE_REFRESH_SECONDS", "30"), 30),
+			ChannelBuffer:     parseMonitoringBuffer(getEnv("MONITORING_CHANNEL_BUFFER", "64"), 64),
+			EscalationSeconds: parseMonitoringBuffer(getEnv("INCIDENT_ESCALATION_SECONDS", "30"), 30),
 		},
 		Log: LogConfig{
 			Level:  getEnv("LOG_LEVEL", "info"),

@@ -16,10 +16,12 @@ import (
 	"Network-control-api/internal/websocket"
 )
 
-// IncidentEngine creates incidents asynchronously from critical alerts.
+// IncidentEngine creates incidents asynchronously from critical alerts and manages escalation.
 type IncidentEngine struct {
-	log  *slog.Logger
-	repo repositories.IncidentRepository
+	log               *slog.Logger
+	repo              repositories.IncidentRepository
+	deviceRepo        repositories.DeviceRepository
+	escalationSeconds int
 
 	criticalCh chan models.Alert
 	eventSink  chan<- websocket.Event
@@ -31,16 +33,21 @@ type IncidentEngine struct {
 	running atomic.Bool
 }
 
-func NewIncidentEngine(log *slog.Logger, repo repositories.IncidentRepository, buffer int, eventSink chan<- websocket.Event) *IncidentEngine {
+func NewIncidentEngine(log *slog.Logger, repo repositories.IncidentRepository, deviceRepo repositories.DeviceRepository, buffer int, escalationSeconds int, eventSink chan<- websocket.Event) *IncidentEngine {
 	if buffer <= 0 {
 		buffer = 64
 	}
+	if escalationSeconds <= 0 {
+		escalationSeconds = 30
+	}
 
 	return &IncidentEngine{
-		log:        log,
-		repo:       repo,
-		criticalCh: make(chan models.Alert, buffer),
-		eventSink:  eventSink,
+		log:               log,
+		repo:              repo,
+		deviceRepo:        deviceRepo,
+		escalationSeconds: escalationSeconds,
+		criticalCh:        make(chan models.Alert, buffer),
+		eventSink:         eventSink,
 	}
 }
 
@@ -54,10 +61,11 @@ func (e *IncidentEngine) Start(parent context.Context) error {
 	}
 
 	e.ctx, e.cancel = context.WithCancel(parent)
-	e.wg.Add(1)
+	e.wg.Add(2)
 	go e.runProcessor()
+	go e.runEscalationWorker()
 
-	e.log.Info("incident engine started")
+	e.log.Info("incident engine started", slog.Int("escalation_seconds", e.escalationSeconds))
 	return nil
 }
 
@@ -85,6 +93,89 @@ func (e *IncidentEngine) runProcessor() {
 			return
 		case alert := <-e.criticalCh:
 			go e.processCriticalAlert(alert)
+		}
+	}
+}
+
+func (e *IncidentEngine) runEscalationWorker() {
+	defer e.wg.Done()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-e.ctx.Done():
+			return
+		case <-ticker.C:
+			e.escalateActiveIncidents()
+		}
+	}
+}
+
+func (e *IncidentEngine) escalateActiveIncidents() {
+	activeIncidents, err := e.repo.FindAllActive(e.ctx)
+	if err != nil {
+		if !errors.Is(err, context.Canceled) {
+			e.log.Error("failed to find active incidents for escalation", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	now := time.Now().UTC()
+	escalationThreshold := time.Duration(e.escalationSeconds) * time.Second
+
+	for _, incident := range activeIncidents {
+		if incident.Escalated || incident.Status != models.IncidentStatusOpen {
+			continue
+		}
+
+		age := now.Sub(incident.CreatedAt)
+		if age >= escalationThreshold {
+			e.log.Info("escalating incident automatically",
+				slog.String("incident_id", incident.ID.String()),
+				slog.Duration("age", age),
+			)
+
+			escalatedTitle := "[ESCALATED] " + incident.Title
+			if err := e.repo.Escalate(e.ctx, incident.ID, escalatedTitle); err != nil {
+				e.log.Error("failed to escalate incident",
+					slog.String("incident_id", incident.ID.String()),
+					slog.String("error", err.Error()),
+				)
+				continue
+			}
+
+			// Write escalation audit log with JSONB metadata
+			logEntry := &models.IncidentLog{
+				ID:         uuid.New(),
+				IncidentID: incident.ID,
+				UserID:     nil,
+				Action:     models.ActionEscalated,
+				Message:    "Incident automatically escalated due to response delay.",
+				Metadata: map[string]any{
+					"escalation_seconds": e.escalationSeconds,
+					"age_seconds":        int(age.Seconds()),
+				},
+				CreatedAt: now,
+			}
+			if err := e.repo.CreateLog(e.ctx, logEntry); err != nil {
+				e.log.Warn("failed to create escalation audit log", slog.String("error", err.Error()))
+			}
+
+			// Update device status in PostgreSQL to offline due to escalation
+			if err := e.deviceRepo.UpdateStatus(e.ctx, incident.DeviceID, "offline"); err != nil {
+				e.log.Error("failed to update device status to offline on escalation",
+					slog.String("device_id", incident.DeviceID.String()),
+					slog.String("error", err.Error()),
+				)
+			}
+
+			incident.Escalated = true
+			incident.Title = escalatedTitle
+			incident.UpdatedAt = now
+
+			e.publishIncident(incident, "", "escalated")
 		}
 	}
 }
@@ -148,6 +239,14 @@ func (e *IncidentEngine) processCriticalAlert(alert models.Alert) {
 		return
 	}
 
+	// Update device status in PostgreSQL to degraded on incident creation
+	if err := e.deviceRepo.UpdateStatus(ctx, alert.DeviceID, "degraded"); err != nil {
+		e.log.Warn("failed to update device status to degraded on incident creation",
+			slog.String("device_id", alert.DeviceID.String()),
+			slog.String("error", err.Error()),
+		)
+	}
+
 	e.log.Info("incident created from critical alert",
 		slog.String("incident_id", incident.ID.String()),
 		slog.String("alert_id", alert.ID.String()),
@@ -199,7 +298,10 @@ func buildIncidentFromAlert(alert models.Alert) *models.Incident {
 		Title:       fmt.Sprintf("Critical %s on %s", alert.Metric, alert.DeviceName),
 		Description: alert.Message,
 		Status:      models.IncidentStatusOpen,
+		Escalated:   false,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
 }
+
+
